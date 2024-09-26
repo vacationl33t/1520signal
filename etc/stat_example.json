@@ -1,0 +1,21 @@
+{
+	"requestCount": 4,
+	"files": [
+		{
+			"filename": "README.md",
+			"size": 3978
+		},
+		{
+			"filename": "Makefile",
+			"size": 34
+		},
+		{
+			"filename": "go.sum",
+			"size": 8715
+		},
+		{
+			"filename": "go.mod",
+			"size": 1477
+		}
+	]
+}
