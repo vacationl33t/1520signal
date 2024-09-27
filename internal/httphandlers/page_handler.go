@@ -21,26 +21,26 @@ type FileInfo struct {
 }
 
 type Statistics struct {
-	RequestCount int       `json:"requestCount"`
+	RequestCount int        `json:"requestCount"`
 	Files        []FileInfo `json:"files"`
 }
 
 type pageHandler struct {
 	formFilePath string
-	mu           sync.Mutex // Для синхронизации доступа к статистике
+	mu           sync.Mutex
 	stats        Statistics
 }
 
 func (ph *pageHandler) Web(c *gin.Context) {
 	t, err := template.ParseFiles(ph.formFilePath)
 	if err != nil {
-		log.WithError(err).Error("Can't parse files")
+		log.WithError(err).Error("Error parsing template file")
 		c.String(http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 
 	if err := t.Execute(c.Writer, nil); err != nil {
-		log.WithError(err).Error("Can't execute template")
+		log.WithError(err).Error("Error executing template")
 		c.String(http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -53,15 +53,25 @@ func (ph *pageHandler) Process(c *gin.Context) {
 		return
 	}
 
-	fileHeader := c.Request.MultipartForm.File["binary_input_data"][0]
+	fileHeader := c.Request.MultipartForm.File["binary_input_data"]
+	if len(fileHeader) == 0 {
+		err := "No files found in the request"
+		log.Error(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		return
+	}
 
-	file, err := fileHeader.Open()
+	file, err := fileHeader[0].Open()
 	if err != nil {
 		log.WithError(err).Error("Error opening file")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not open file"})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.WithError(err).Error("Error closing file")
+		}
+	}()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
@@ -72,14 +82,14 @@ func (ph *pageHandler) Process(c *gin.Context) {
 
 	log.Debugf("Received data: %+v", data)
 
-	// Обновляем статистику
+	// Обновление статистики
 	ph.mu.Lock()
+	defer ph.mu.Unlock()
 	ph.stats.RequestCount++
 	ph.stats.Files = append(ph.stats.Files, FileInfo{
-		Filename: fileHeader.Filename,
-		Size:     fileHeader.Size,
+		Filename: fileHeader[0].Filename,
+		Size:     fileHeader[0].Size,
 	})
-	ph.mu.Unlock()
 
 	result := bitcounter.Process(&bitcounter.Input{Data: data})
 	c.JSON(http.StatusOK, result)

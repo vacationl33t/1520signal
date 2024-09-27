@@ -34,7 +34,7 @@ func (r *routerImpl) Run() error {
 
 	router.GET("/", ph.Web)
 	router.POST("/", ph.Process)
-	// router.GET("/stat", ph.Stat)
+	router.GET("/stat", ph.Stat)
 
 	if err := router.Run(r.cfg.ServerAddress); err != nil {
 		return err
